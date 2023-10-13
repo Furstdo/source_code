@@ -69,7 +69,7 @@ class Truck():
                 yield env.process(charging_station.charge_vechicle(truck))
                 self.charge += charging_station.amount
         #Determine the total time a truckdriver is needing for a charge
-        wait_times.append(env.now -begin_time)
+        #wait_times.append(env.now -begin_time)
 
 
 
