@@ -7,6 +7,9 @@ import matplotlib.pyplot as plt
 battery_trend = []
 wait_times = []
 time_stamp = []
+
+AVERAGE_SOLAR_GENERATION = 0.5
+
 print("fre")
 #Create an class that mimics an charging station
 class Charging_station():
@@ -22,10 +25,18 @@ class Charging_station():
     #This method controls the solar panel 
     def solar_panel(self):
         while True:
-            yield self.env.timeout(0.016)
-            #This method controls the solar panel
+            current_hour = (self.env.now % 1440) / 60.0  # Convert current time to hours
+
+            # Only generate power between 6AM and 6PM
+            if 6 <= current_hour <= 18:
+                normalized_solar_output = np.sin(np.pi * (current_hour - 6) / 12)  # Gives a value between 0 and 1
+                self.solar_power = normalized_solar_output * AVERAGE_SOLAR_GENERATION  # Scale using average
+                
+            else:
+                self.solar_power = 0  # No solar generation during the night
+
             self.battery_amount += self.solar_power
-            self.solar_power += 0.000006
+            yield self.env.timeout(1)  # Update every minute
 
     def trend_battery(self):
         time = 0
