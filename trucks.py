@@ -100,11 +100,12 @@ def run_station(env, num_chargers):
     env.process(truck[1 -1].charge_truck(env, truck, charge_station))
     env.process(charge_station.trend_battery())
     while True:
-        yield env.timeout(5)
-        truck.append(Truck(50,1))
+        next_arrival = np.random.poisson(TIME_BETWEEN_ARRIVALS)
+        yield env.timeout(next_arrival)
         number += 1
-        truck.append(Truck(50,number))
-        env.process(truck[number -1].charge_truck(env,truck,charge_station))
+        truck.append(Truck(50, number))
+        env.process(truck[number - 1].charge_truck(env, truck, charge_station))
+...
 
 
 
