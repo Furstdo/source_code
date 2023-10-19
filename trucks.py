@@ -5,8 +5,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 battery_trend = []
-wait_times = []
-time_stamp = []
+wait_times    = []
+time_stamp    = []
 
 AVERAGE_SOLAR_GENERATION = 0.5
 AVERAGE_ARRIVALS_PER_HOUR = 10 
@@ -17,7 +17,7 @@ print("fre")
 #Create an class that mimics an charging station
 class Charging_station():
     #Init method for the charging station class
-    def __init__(self,env,num_charging_stations):
+    def __init__(self, env, num_charging_stations):
         self.env = env
         self.charge_station = simpy.Resource(env,num_charging_stations)
         self.battery_amount =150000
@@ -67,11 +67,11 @@ class Charging_station():
 
 class Truck():
     #Init the truck class
-    def __init__(self,charge_left,number):
+    def __init__(self, charge_left, number):
         self.charge = charge_left
         self.number = number
 
-    def charge_truck(self,env,truck,charging_station):
+    def charge_truck(self, env, truck, charging_station):
         #Get the starting time
         begin_time = env.now
         #Charge the truck
@@ -88,26 +88,23 @@ class Truck():
 
 
 #This function runs the charging station
-def run_station(env,num_chargers):
+def run_station(env, num_chargers):
     truck = []
     number = 1
     #Create the simmulation enviroment
-    charge_station = Charging_station(env,num_chargers )     
+    charge_station = Charging_station(env, num_chargers )     
     #Set 1 car in the waiting line
-    truck.append(Truck(50,1))
+    truck.append(Truck(50, 1))
     #Add the solat panel to the enviroment\
     env.process(charge_station.solar_panel())
-    env.process(truck[1 -1].charge_truck(env,truck,charge_station))
+    env.process(truck[1 -1].charge_truck(env, truck, charge_station))
     env.process(charge_station.trend_battery())
     while True:
-        # Determine the next truck arrival using the Poisson distribution from numpy
-        next_arrival = np.random.poisson(TIME_BETWEEN_ARRIVALS)
-        yield env.timeout(next_arrival)
-        
-        # Once the next truck arrives, add it to the list of trucks and process its charging
+        yield env.timeout(5)
+        truck.append(Truck(50,1))
         number += 1
-        truck.append(Truck(50, number))
-        env.process(truck[number - 1].charge_truck(env, truck, charge_station))
+        truck.append(Truck(50,number))
+        env.process(truck[number -1].charge_truck(env,truck,charge_station))
 
 
 
@@ -124,7 +121,7 @@ def main():
     random.seed(30)
     #Run the simmulation
     env = simpy.Environment()
-    env.process(run_station(env,5))
+    env.process(run_station(env, 5))
 
     #Run the simmulation for 1 day
     env.run(until= 1440)
