@@ -9,6 +9,9 @@ wait_times = []
 time_stamp = []
 
 AVERAGE_SOLAR_GENERATION = 0.5
+AVERAGE_ARRIVALS_PER_HOUR = 10 
+TIME_BETWEEN_ARRIVALS = 60 / AVERAGE_ARRIVALS_PER_HOUR 
+
 
 print("fre")
 #Create an class that mimics an charging station
@@ -97,11 +100,14 @@ def run_station(env,num_chargers):
     env.process(truck[1 -1].charge_truck(env,truck,charge_station))
     env.process(charge_station.trend_battery())
     while True:
-        yield env.timeout(5)
-        truck.append(Truck(50,1))
+        # Determine the next truck arrival using the Poisson distribution from numpy
+        next_arrival = np.random.poisson(TIME_BETWEEN_ARRIVALS)
+        yield env.timeout(next_arrival)
+        
+        # Once the next truck arrives, add it to the list of trucks and process its charging
         number += 1
-        truck.append(Truck(50,number))
-        env.process(truck[number -1].charge_truck(env,truck,charge_station))
+        truck.append(Truck(50, number))
+        env.process(truck[number - 1].charge_truck(env, truck, charge_station))
 
 
 
@@ -125,7 +131,7 @@ def main():
     #View the results
     mins, secs = get_average_wait_time(wait_times)
     print("Running simmulation...", 
-          f"\nThe average wait time is {mins} minutes and {secs} seconds.")
+          f"\nThe average wait time is {mins} minutes and {secs} secondsssss.")
     
     print()
     
