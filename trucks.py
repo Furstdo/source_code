@@ -70,20 +70,29 @@ class Truck():
     def __init__(self, charge_left, number):
         self.charge = charge_left
         self.number = number
+        self.max_wait_time = random.randint(30, 180)  # Time needed to load at the distribution center, while charging.
 
     def charge_truck(self, env, truck, charging_station):
         #Get the starting time
         begin_time = env.now
         #Charge the truck
         with charging_station.charge_station.request() as request:
-            #Wait for an free charging station
-            yield request
-            #Start the charging
-            while self.charge < 7200:
-                yield env.process(charging_station.charge_vechicle(truck))
-                self.charge += charging_station.amount
-        #Determine the total time a truckdriver is needing for a charge
-        wait_times.append(env.now -begin_time) #Deze moet wel aan blijven!!!!!!!
+            # Wait for a free charging station or until loading is done
+            result = yield request | env.timeout(self.max_wait_time)
+            
+            if request in result:
+                # Start the charging
+                charging_time = 0
+                while self.charge < 7200 and charging_time < self.max_wait_time:
+                    yield env.process(charging_station.charge_vechicle(truck))
+                    self.charge += charging_station.amount
+                    charging_time = env.now - begin_time
+            else:
+                # If the truck didn't get to charge, it'll depart after loading is done
+                yield env.timeout(self.max_wait_time - (env.now - begin_time))
+
+        # Determine the total time a truck driver is needing for a charge (or for loading)
+        wait_times.append(env.now - begin_time)
 
 
 
