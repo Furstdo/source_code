@@ -1,8 +1,15 @@
 import pandas as pd
 
-file_path = r"/mnt/c/Users/s139501/CSV/open_metervalues.csv"  #define path for WSL is different
+file_path1 = r"/mnt/c/Users/s139501/CSV/open_transactions.csv"  #define path for WSL is different
+file_path2 = r"/mnt/c/Users/s139501/CSV/open_metervalues.csv"  #define path for WSL is different
 
-df = pd.read_csv(file_path, delimiter=';', decimal=',') #europeans
+df1 = pd.read_csv(file_path1, delimiter=';', decimal=',') #europeans
+df2 = pd.read_csv(file_path2, delimiter=';', decimal=',') #europeans
 
 
-print(df.head()) # Print first 5 rows
+#print(df1.head()) # Print first 5 rows
+print(df2.head()) # Print first 5 rows
+
+#print(df1[['ConnectedTime', 'ChargeTime', 'TotalEnergy', 'MaxPower']].describe())
+
+print(df2[['Collectedvalue', 'EnergyInterval', 'AveragePower']].describe())
