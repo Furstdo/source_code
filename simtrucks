@@ -1,0 +1,102 @@
+import salabim as sim
+import random
+import statistics
+import numpy as np
+import matplotlib.pyplot as plt
+
+AVERAGE_SOLAR_GENERATION = 0.5
+AVERAGE_ARRIVALS_PER_HOUR = 10
+TIME_BETWEEN_ARRIVALS = 60 / AVERAGE_ARRIVALS_PER_HOUR
+
+battery_trend = []
+wait_times = []
+time_stamp = []
+
+env = sim.Environment(trace=False)
+
+class Charging_station(sim.Component):
+    def setup(self, num_charging_stations):
+        self.charge_station = sim.Resource(capacity=num_charging_stations)
+        self.battery_amount = 150000
+        self.amount = 2
+        self.battery_drained = False
+        self.solar_power = 0
+
+    def process(self):
+        while True:
+            self.update_solar_power()
+            self.charge_battery()
+            yield self.hold(1)  # Update every minute
+
+    def update_solar_power(self):
+        current_hour = (sim.now() % 1440) / 60.0
+        if 6 <= current_hour <= 18:
+            normalized_solar_output = np.sin(np.pi * (current_hour - 6) / 12)
+            self.solar_power = normalized_solar_output * AVERAGE_SOLAR_GENERATION
+        else:
+            self.solar_power = 0
+
+    def charge_battery(self):
+        self.battery_amount += self.solar_power
+        battery_trend.append(self.battery_amount)
+        time_stamp.append(sim.now())
+
+    def charge_vehicle(self, vehicle):
+        if self.battery_amount > 1:
+            self.amount = 2
+        else:
+            if not self.battery_drained:
+                print("Battery Drained")
+                self.battery_drained = True
+            self.amount = 1
+        self.battery_amount -= 1
+
+
+class Truck(sim.Component):
+    def setup(self, charge_left):
+        self.charge = charge_left
+        self.max_wait_time = random.randint(30, 180)
+
+    def process(self):
+        begin_time = sim.now()
+        req = self.request(charging_station.charge_station)
+
+        yield self.hold(self.max_wait_time)
+
+        if req.is_claimed():
+            self.release(charging_station.charge_station)
+            charging_time = 0
+            while self.charge < 7200 and charging_time < self.max_wait_time:
+                charging_station.charge_vehicle(self)
+                self.charge += charging_station.amount
+                charging_time = sim.now() - begin_time
+
+        wait_times.append(sim.now() - begin_time)
+
+charging_station = Charging_station(num_charging_stations=5).activate()
+
+class TruckGenerator(sim.Component):
+    def process(self):
+        while True:
+            yield self.hold(np.random.poisson(TIME_BETWEEN_ARRIVALS))
+            Truck(charge_left=50).activate()
+
+
+def get_average_wait_time():
+    average_wait = statistics.mean(wait_times)
+    minutes, frac_minutes = divmod(average_wait, 2)
+    seconds = frac_minutes * 60
+    return round(minutes), round(seconds)
+
+
+TruckGenerator().activate()
+env.run(till=1440)
+
+mins, secs = get_average_wait_time()
+print("Running simulation...", f"\nThe average wait time is {mins} minutes and {secs} seconds.")
+
+y = np.array(battery_trend)
+x = np.array(time_stamp)
+slope, intercept = np.polyfit(x, y, 1)
+plt.plot(x, y)
+plt.show()
