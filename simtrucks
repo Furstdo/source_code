@@ -15,7 +15,8 @@ time_stamp = []
 env = sim.Environment(trace=False)
 
 class Charging_station(sim.Component):
-    def setup(self, num_charging_stations):
+    def setup(self, env, num_charging_stations):
+        self.env = env
         self.charge_station = sim.Resource(capacity=num_charging_stations)
         self.battery_amount = 150000
         self.amount = 2
@@ -51,7 +52,6 @@ class Charging_station(sim.Component):
             self.amount = 1
         self.battery_amount -= 1
 
-
 class Truck(sim.Component):
     def setup(self, charge_left):
         self.charge = charge_left
@@ -73,14 +73,11 @@ class Truck(sim.Component):
 
         wait_times.append(sim.now() - begin_time)
 
-charging_station = Charging_station(num_charging_stations=5).activate()
-
 class TruckGenerator(sim.Component):
     def process(self):
         while True:
             yield self.hold(np.random.poisson(TIME_BETWEEN_ARRIVALS))
             Truck(charge_left=50).activate()
-
 
 def get_average_wait_time():
     average_wait = statistics.mean(wait_times)
@@ -88,8 +85,10 @@ def get_average_wait_time():
     seconds = frac_minutes * 60
     return round(minutes), round(seconds)
 
+charging_station = Charging_station(env, num_charging_stations=5)
+charging_station.activate()
 
-TruckGenerator().activate()
+TruckGenerator(env).activate()
 env.run(till=1440)
 
 mins, secs = get_average_wait_time()
