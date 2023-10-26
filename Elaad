@@ -7,9 +7,17 @@ df1 = pd.read_csv(file_path1, delimiter=';', decimal=',') #europeans
 df2 = pd.read_csv(file_path2, delimiter=';', decimal=',') #europeans
 
 
-print(df1.head()) # Print first 5 rows
-print(df2.head()) # Print first 5 rows
+#print(df1.head()) # Print first 5 rows
+#df1.head().to_excel('/mnt/c/Users/s139501/Exceloutput/df1head.xlsx', index=False, engine='openpyxl') #export to excel for table in report
 
-print(df1[['ConnectedTime', 'ChargeTime', 'TotalEnergy', 'MaxPower']].describe())
+#print(df2.head()) # Print first 5 rows
+#df2.head().to_excel('/mnt/c/Users/s139501/Exceloutput/df2head.xlsx', index=False, engine='openpyxl') #export to excel for table in report
 
-print(df2[['Collectedvalue', 'EnergyInterval', 'AveragePower']].describe())
+#print(df1[['ConnectedTime', 'ChargeTime', 'TotalEnergy', 'MaxPower']].describe())
+#describe_df1 = df1[['ConnectedTime', 'ChargeTime', 'TotalEnergy', 'MaxPower']].describe()
+#describe_df1.to_excel('/mnt/c/Users/s139501/Exceloutput/df1describe.xlsx', index=True, engine='openpyxl')
+
+
+#print(df2[['Collectedvalue', 'EnergyInterval', 'AveragePower']].describe())
+#describe_df2 = df2[['Collectedvalue', 'EnergyInterval', 'AveragePower']].describe()
+#describe_df2.to_excel('/mnt/c/Users/s139501/Exceloutput/df2describe.xlsx', index=True, engine='openpyxl')
