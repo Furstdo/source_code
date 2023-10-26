@@ -7,22 +7,38 @@ file_path2 = r"/mnt/c/Users/s139501/CSV/open_metervalues.csv"  #define path for 
 df1 = pd.read_csv(file_path1, delimiter=';', decimal=',') #europeans
 df2 = pd.read_csv(file_path2, delimiter=';', decimal=',') #europeans
 
-# Convert the UTCTransactionStart column to datetime
+##Average Daily Arrival and Departure Distribution##
+
+# Convert the columns to datetime
 df1['UTCTransactionStart'] = pd.to_datetime(df1['UTCTransactionStart'], format='%d/%m/%Y %H:%M')
+df1['UTCTransactionStop'] = pd.to_datetime(df1['UTCTransactionStop'], format='%d/%m/%Y %H:%M')
 
-# Extract the hour
-df1['TransactionHour'] = df1['UTCTransactionStart'].dt.hour
+# Extract the hours
+df1['ArrivalHour'] = df1['UTCTransactionStart'].dt.hour
+df1['DepartureHour'] = df1['UTCTransactionStop'].dt.hour
 
-# Count the number of transactions for each hour
-transaction_counts = df1['TransactionHour'].value_counts().sort_index()
+# Count the number of arrivals and departures for each hour
+arrival_counts = df1['ArrivalHour'].value_counts().sort_index()
+departure_counts = df1['DepartureHour'].value_counts().sort_index()
 
-# Plot the average arrival distribution for a day
-transaction_counts.plot(kind='bar')
-plt.title('Average Arrival Distribution of Transactions over 24 Hours')
+# Plot the average arrival distribution
+plt.figure(figsize=(10, 5))
+arrival_counts.plot(kind='bar')
+plt.title('Average Arrival Distribution over 24 Hours')
 plt.xlabel('Hour of Day')
-plt.ylabel('Number of Transactions')
-plt.xticks(range(24))  # set x-ticks to be hourly
+plt.ylabel('Number of Arrivals')
+plt.xticks(range(24))
 plt.tight_layout()
+
+# Plot the average departure distribution
+plt.figure(figsize=(10, 5))
+departure_counts.plot(kind='bar')
+plt.title('Average Departure Distribution over 24 Hours')
+plt.xlabel('Hour of Day')
+plt.ylabel('Number of Departures')
+plt.xticks(range(24))
+plt.tight_layout()
+
 plt.show()
 
 #Prints and Excel exports
