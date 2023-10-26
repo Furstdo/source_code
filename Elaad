@@ -1,4 +1,5 @@
 import pandas as pd
+import matplotlib.pyplot as plt
 
 file_path1 = r"/mnt/c/Users/s139501/CSV/open_transactions.csv"  #define path for WSL is different
 file_path2 = r"/mnt/c/Users/s139501/CSV/open_metervalues.csv"  #define path for WSL is different
@@ -6,6 +7,25 @@ file_path2 = r"/mnt/c/Users/s139501/CSV/open_metervalues.csv"  #define path for 
 df1 = pd.read_csv(file_path1, delimiter=';', decimal=',') #europeans
 df2 = pd.read_csv(file_path2, delimiter=';', decimal=',') #europeans
 
+# Convert the UTCTransactionStart column to datetime
+df1['UTCTransactionStart'] = pd.to_datetime(df1['UTCTransactionStart'], format='%d/%m/%Y %H:%M')
+
+# Extract the hour
+df1['TransactionHour'] = df1['UTCTransactionStart'].dt.hour
+
+# Count the number of transactions for each hour
+transaction_counts = df1['TransactionHour'].value_counts().sort_index()
+
+# Plot the average arrival distribution for a day
+transaction_counts.plot(kind='bar')
+plt.title('Average Arrival Distribution of Transactions over 24 Hours')
+plt.xlabel('Hour of Day')
+plt.ylabel('Number of Transactions')
+plt.xticks(range(24))  # set x-ticks to be hourly
+plt.tight_layout()
+plt.show()
+
+#Prints and Excel exports
 
 #print(df1.head()) # Print first 5 rows
 #df1.head().to_excel('/mnt/c/Users/s139501/Exceloutput/df1head.xlsx', index=False, engine='openpyxl') #export to excel for table in report
