@@ -33,7 +33,9 @@ class Prepare():
         #Create an empty list where we can store the truck scedual
         self.trucks = []
         random.seed(time.time())
+
     def prepare_data(self):
+        self.trucks = []
         time = 0
         #Loop until a day is finished
         while time <1400:                      
@@ -126,37 +128,46 @@ class Customer(sim.Component):
 #-------------------------------------------------------------------------------------------
 class sim_manager():
     def __init__(self,Charging_Stations):
-        pass
+        self.shedual = Prepare()
+        self.Charging_stations = Charging_Stations
+        #Prepare the truck data
+        self.shedual.prepare_data()
 
-#This function runs the simmulation
-def run_sim(amount_clerks):
-    #Create varaibles for monitoring
-    wait_Times = []
-    #Prepare the truck data
-    shedual = Prepare()
-    shedual.prepare_data()
-    #Create the objects that make up the simmulation
-    env_Sim = sim.Environment(trace=False)
-    waiting_room = sim.Queue("waitingline88")
-    clerks = [Charging_Station(waiting_room=waiting_room,env=env_Sim) for _ in range(amount_clerks)]
-    generator = CustomerGenerator(waiting_room= waiting_room,env=env_Sim,clerks=clerks,wait_times = wait_Times,shedual= shedual.trucks )
-    #Start the simmulation
-    env_Sim.run(till=1440)
-    #Delete the objects from the memory
-    del(env_Sim)
-    del(waiting_room)
-    for clerk in clerks:
-        del(clerk)
-    del(generator)
+    #This function runs the simmulation
+    def run_sim(self):
+        #Create varaibles for monitoring
+        wait_Times = []
+        #Prepare the truck data
 
-    #Get the output of the simmulation
-    avg = sum(wait_Times)/len(wait_Times)
-    min_o = min(wait_Times)
-    max_o = max(wait_Times)
+        #Create the objects that make up the simmulation
+        env_Sim = sim.Environment(trace=False)
+        waiting_room = sim.Queue("waitingline88")
+        clerks = [Charging_Station(waiting_room=waiting_room,env=env_Sim) for _ in range(self.Charging_stations)]
+        generator = CustomerGenerator(waiting_room= waiting_room,env=env_Sim,clerks=clerks,wait_times = wait_Times,shedual= self.shedual.trucks )
+        #Start the simmulation
+        env_Sim.run(till=1440)
+        #Delete the objects from the memory
+        del(env_Sim)
+        del(waiting_room)
+        for clerk in clerks:
+            del(clerk)
+        del(generator)
 
-    return int(avg),int(min_o),int(max_o)
+        #Get the output of the simmulation
+        avg = sum(wait_Times)/len(wait_Times)
+        min_o = min(wait_Times)
+        max_o = max(wait_Times)
 
-print(run_sim(3))
+        return int(avg),int(min_o),int(max_o)
+
+    def reset_shedual(self):
+        self.shedual.prepare_data()
+
+sim_m = sim_manager(3)
+print(sim_m.run_sim())
+sim_m.reset_shedual()
+print(sim_m.run_sim())
+
 #-------------------------------------------------------------------------------------------
 #Create a truck enviroment that the model is going to perform in
 class TruckEnv(Env):
@@ -167,11 +178,12 @@ class TruckEnv(Env):
         self.state = 0
         self.done = False
         self.running = False
+        self.sim_env = sim_manager(3)
         #self.env_sim = env = sim.Environment(trace=False)    
 
     def step(self,action):           
         print(action)
-        wait_time = run_sim(action)
+        wait_time = self.sim_env.run_sim(action)
         
         done = True         
         info = {}
@@ -188,6 +200,21 @@ class TruckEnv(Env):
 
     def reset(self,seed =None):
         super().reset(seed=seed) 
+        #Reset the simmulation enviroment
+        self.sim_env.reset_shedual()
+        #Get a local copy of the schedule
+        schedule = self.sim_env.shedual.trucks
+
+        battery = []
+        arriaval_time =[]
+        #Extract the data from the schedule
+        for i in schedule:
+            battery.append(i.Battery)
+            arriaval_time.append(i.Arrival_Time)
+        print(arriaval_time)
+
+
+
         #Create a 
         self.state = 100
         info = {}
@@ -195,6 +222,7 @@ class TruckEnv(Env):
 
   
 env = TruckEnv()
+env.reset()
 log_path = os.path.join('.','logs')
 #model = PPO('MlpPolicy', env, verbose = 1, tensorboard_log = log_path)
 
