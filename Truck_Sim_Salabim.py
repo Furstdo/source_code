@@ -13,12 +13,8 @@ from stable_baselines3.common.vec_env import VecFrameStack
 from stable_baselines3.common.evaluation import evaluate_policy
 from dataclasses import dataclass
 import matplotlib.pyplot as plt
-
-# Bank, 1 clerk.py
 import salabim as sim
 #-------------------------------------------------------------------------------------------
-action_Cust = 5
-
 #Struct that holds the information regarding a truck
 @dataclass
 class Truck:
@@ -212,7 +208,9 @@ class TruckEnv(Env):
             battery.append(i.Battery)
             arriaval_time.append(i.Arrival_Time)
         print(arriaval_time)
-
+        battery_np = np.array(battery)
+        arriaval_time_np = np.array(arriaval_time)
+        
 
 
         #Create a 
