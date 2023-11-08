@@ -16,30 +16,64 @@ import matplotlib.pyplot as plt
 
 # Bank, 1 clerk.py
 import salabim as sim
-
+#-------------------------------------------------------------------------------------------
 action_Cust = 5
 
+#Struct that holds the information regarding a truck
 @dataclass
 class Truck:
     Battery:        np.int16
-    Amount_cars:    np.int16
+    Arrival_Time:   np.int16
+    total_time:     np.int16
 
+#-------------------------------------------------------------------------------------------
 
+#Class that prepares a car arrival set
+class Prepare():
+    def __init__(self):
+        #Create an empty list where we can store the truck scedual
+        self.trucks = []
+        
+    def prepare_data(self):
+        time = 0
+        #Loop until a day is finished
+        while time <1400:                      
+            #Create a new data object
+            Truck_Data = Truck(Battery= sim.Uniform(20, 80).sample(),Arrival_Time=time,total_time=0)  
+            #Append the data to the list
+            self.trucks.append(Truck_Data)   
+            #Determine the new arrival time
+            time += sim.Uniform(10, 40).sample()
+
+#-------------------------------------------------------------------------------------------
 class CustomerGenerator(sim.Component):
-    def __init__(self,waiting_room,env,clerks,wait_times):
+    def __init__(self,waiting_room,env,clerks,wait_times,shedual):
         super().__init__()
         self.waiting_room = waiting_room
         self.env = env
         self.clerks = clerks
         self.debug = False
         self.wait_times = wait_times
+        self.shedual = shedual
 
     def process(self):
         while True:
-            cust =Customer(waiting_room= self.waiting_room,env=self.env,stations=self.clerks,wait_times = self.wait_times)
+            previous_arrival = 0
+            #Check if there ia an truck left in the list
+            if len(self.shedual) > 0:
+                #Get the next truck out of the list
+                truck = self.shedual.pop(0)
+            else:
+                #Break when there are no more trucks to create
+                break
+            #Create a truck object
+            cust =Customer(waiting_room= self.waiting_room,env=self.env,stations=self.clerks,wait_times = self.wait_times,battery_charge=truck.Battery)
             cust.creation_time = self.env.now()
-            self.hold(sim.Uniform(30, 35).sample())
-            self.debug = True
+            #Hold the simmulation until the next truck is sheduald
+            self.hold(truck.Arrival_Time - previous_arrival)
+            #Set the previous time
+            previous_arrival = truck.Arrival_Time
+
 
 class Charging_Station(sim.Component):
     def __init__(self,waiting_room,env):
@@ -71,12 +105,12 @@ class Charging_Station(sim.Component):
 
 
 class Customer(sim.Component):
-    def __init__(self,waiting_room,env,stations,wait_times):
+    def __init__(self,waiting_room,env,stations,wait_times,battery_charge):
         super().__init__()
         self.waiting_room = waiting_room
         self.env = env
         self.stations = stations
-        self.battery_charge = int(random.uniform(20, 80))
+        self.battery_charge = battery_charge
         self.creation_time = 0
         self.wait_times = wait_times
 
@@ -95,15 +129,18 @@ generator_ok = False
 
 
 
+#-------------------------------------------------------------------------------------------
 #This function runs the simmulation
 def run_sim(amount_clerks):
     #Create varaibles for monitoring
     wait_Times = []
+    #Prepare the truck data
+    shedual = Prepare()
     #Create the objects that make up the simmulation
     env_Sim = sim.Environment(trace=False)
     waiting_room = sim.Queue("waitingline88")
     clerks = [Charging_Station(waiting_room=waiting_room,env=env_Sim) for _ in range(amount_clerks)]
-    generator = CustomerGenerator(waiting_room= waiting_room,env=env_Sim,clerks=clerks,wait_times = wait_Times)
+    generator = CustomerGenerator(waiting_room= waiting_room,env=env_Sim,clerks=clerks,wait_times = wait_Times,shedual= shedual.trucks )
     #Start the simmulation
     env_Sim.run(till=1440)
     #Delete the objects from the memory
@@ -120,8 +157,8 @@ def run_sim(amount_clerks):
 
     return int(avg),int(min_o),int(max_o)
 
-
-
+run_sim(3)
+#-------------------------------------------------------------------------------------------
 #Create a truck enviroment that the model is going to perform in
 class TruckEnv(Env):
     def __init__(self):
@@ -152,6 +189,7 @@ class TruckEnv(Env):
 
     def reset(self,seed =None):
         super().reset(seed=seed) 
+        #Create a 
         self.state = 100
         info = {}
         return np.float32(self.state), info   
