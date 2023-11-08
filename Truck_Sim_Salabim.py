@@ -7,16 +7,23 @@ from gymnasium.spaces import Discrete, Box, Dict, Tuple, MultiBinary, MultiDiscr
 import numpy as np
 import random
 import os
+import time
 from stable_baselines3 import PPO
 from stable_baselines3.common.vec_env import VecFrameStack
 from stable_baselines3.common.evaluation import evaluate_policy
-
+from dataclasses import dataclass
 import matplotlib.pyplot as plt
 
 # Bank, 1 clerk.py
 import salabim as sim
 
 action_Cust = 5
+
+@dataclass
+class Truck:
+    Battery:        np.int16
+    Amount_cars:    np.int16
+
 
 class CustomerGenerator(sim.Component):
     def __init__(self,waiting_room,env,clerks,wait_times):
@@ -37,6 +44,7 @@ class CustomerGenerator(sim.Component):
 class Charging_Station(sim.Component):
     def __init__(self,waiting_room,env):
         super().__init__()
+        random.seed(time.time())
         self.waiting_room = waiting_room
         self.vehicle = 0
         self.env =  env
@@ -85,6 +93,8 @@ class Customer(sim.Component):
 
 generator_ok = False
 
+
+
 #This function runs the simmulation
 def run_sim(amount_clerks):
     #Create varaibles for monitoring
@@ -110,7 +120,7 @@ def run_sim(amount_clerks):
 
     return int(avg),int(min_o),int(max_o)
 
-print(run_sim(100))
+
 
 #Create a truck enviroment that the model is going to perform in
 class TruckEnv(Env):
@@ -126,8 +136,7 @@ class TruckEnv(Env):
     def step(self,action):           
         print(action)
         wait_time = run_sim(action)
-        self.state = 0
-        reward = 1 
+        
         done = True         
         info = {}
         if wait_time >70 and wait_time <80:
@@ -142,12 +151,13 @@ class TruckEnv(Env):
         pass
 
     def reset(self,seed =None):
+        super().reset(seed=seed) 
         self.state = 100
         info = {}
         return np.float32(self.state), info   
 
   
-#env = TruckEnv()
+env = TruckEnv()
 log_path = os.path.join('.','logs')
 #model = PPO('MlpPolicy', env, verbose = 1, tensorboard_log = log_path)
 
