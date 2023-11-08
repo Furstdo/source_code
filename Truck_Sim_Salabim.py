@@ -27,13 +27,12 @@ class Truck:
     total_time:     np.int16
 
 #-------------------------------------------------------------------------------------------
-
 #Class that prepares a car arrival set
 class Prepare():
     def __init__(self):
         #Create an empty list where we can store the truck scedual
         self.trucks = []
-        
+        random.seed(time.time())
     def prepare_data(self):
         time = 0
         #Loop until a day is finished
@@ -44,7 +43,6 @@ class Prepare():
             self.trucks.append(Truck_Data)   
             #Determine the new arrival time
             time += sim.Uniform(10, 40).sample()
-
 #-------------------------------------------------------------------------------------------
 class CustomerGenerator(sim.Component):
     def __init__(self,waiting_room,env,clerks,wait_times,shedual):
@@ -57,13 +55,14 @@ class CustomerGenerator(sim.Component):
         self.shedual = shedual
 
     def process(self):
-        while True:
-            previous_arrival = 0
+        previous_arrival = 0
+        while True:            
             #Check if there ia an truck left in the list
             if len(self.shedual) > 0:
                 #Get the next truck out of the list
                 truck = self.shedual.pop(0)
             else:
+                print("Break")
                 #Break when there are no more trucks to create
                 break
             #Create a truck object
@@ -115,7 +114,6 @@ class Customer(sim.Component):
         self.wait_times = wait_times
 
     def process(self):        
-        
         #Put the vehicle in the waiting room
         self.enter(self.waiting_room)
         #Check if there is a station that is passive
@@ -125,17 +123,18 @@ class Customer(sim.Component):
                 break  # activate at most one clerk
         self.passivate()
 
-generator_ok = False
-
-
-
 #-------------------------------------------------------------------------------------------
+class sim_manager():
+    def __init__(self,Charging_Stations):
+        pass
+
 #This function runs the simmulation
 def run_sim(amount_clerks):
     #Create varaibles for monitoring
     wait_Times = []
     #Prepare the truck data
     shedual = Prepare()
+    shedual.prepare_data()
     #Create the objects that make up the simmulation
     env_Sim = sim.Environment(trace=False)
     waiting_room = sim.Queue("waitingline88")
@@ -157,7 +156,7 @@ def run_sim(amount_clerks):
 
     return int(avg),int(min_o),int(max_o)
 
-run_sim(3)
+print(run_sim(3))
 #-------------------------------------------------------------------------------------------
 #Create a truck enviroment that the model is going to perform in
 class TruckEnv(Env):
