@@ -8,19 +8,22 @@ import numpy as np
 import random
 import os
 import time
+from scipy.stats import expon
 from stable_baselines3 import PPO
 from stable_baselines3.common.vec_env import VecFrameStack
 from stable_baselines3.common.evaluation import evaluate_policy
 from dataclasses import dataclass
 import matplotlib.pyplot as plt
 import salabim as sim
+
 #-------------------------------------------------------------------------------------------
 #Struct that holds the information regarding a truck
 @dataclass
 class Truck:
-    Battery:        np.int16
-    Arrival_Time:   np.int16
-    total_time:     np.int16
+    Battery:            np.int16
+    Arrival_Time:       np.int16
+    total_time:         np.int16
+    total_wait_Time:    np.int16
 
 #-------------------------------------------------------------------------------------------
 #Class that prepares a car arrival set
@@ -30,17 +33,38 @@ class Prepare():
         self.trucks = []
         random.seed(time.time())
 
-    def prepare_data(self):
+    def prepare_data(self,spread_type):
         self.trucks = []
         time = 0
+        first = False   
         #Loop until a day is finished
-        while time <1400:                      
-            #Create a new data object
-            Truck_Data = Truck(Battery= sim.Uniform(20, 80).sample(),Arrival_Time=time,total_time=0)  
+        while time <1400:                 
+            if spread_type == 1:     
+                #Create a new data object
+                Truck_Data = Truck(Battery= sim.Uniform(20, 80).sample(),Arrival_Time=time,total_time=0)  
+            elif spread_type == 2:                            
+                Truck_Data = Truck(Battery= sim.Uniform(40).sample(),Arrival_Time=time,total_time=0,total_wait_Time=0)   
+            elif spread_type == 3: 
+                arrival, service_time = self.poison()
+                service_invert = 100 - service_time[0] *60
+                Truck_Data = Truck(Battery= service_invert,Arrival_Time=time,total_time=0,total_wait_Time=0)   
             #Append the data to the list
             self.trucks.append(Truck_Data)   
             #Determine the new arrival time
-            time += sim.Uniform(10, 40).sample()
+            if first == False: 
+                time += arrival[0] *60
+            else:
+                first = True
+
+    def poison(self):
+        Arrival_Mean = 60/40
+        Service_Mean = 60/50
+  
+        service_time = expon.rvs(scale=Service_Mean, size=1)
+        time_till_next_arrival = expon.rvs(scale=Arrival_Mean, size=1)
+        return time_till_next_arrival,service_time
+    
+test = Prepare()
 #-------------------------------------------------------------------------------------------
 class CustomerGenerator(sim.Component):
     def __init__(self,waiting_room,env,clerks,wait_times,shedual):
@@ -92,12 +116,13 @@ class Charging_Station(sim.Component):
     #This method charges car and stops when the car has been charged
     def charge_car(self):
         loop = 0
+        self.vehicle.wait_times.append(self.env.now() - self.vehicle.creation_time)
         while self.vehicle.battery_charge < 100:
             self.hold(1)
             self.vehicle.battery_charge +=1
             loop +=1
         #Calculate the time that the complete charging procedure took
-        self.vehicle.wait_times.append(self.env.now() - self.vehicle.creation_time)
+        
         return loop
 
 
@@ -114,6 +139,7 @@ class Customer(sim.Component):
     def process(self):        
         #Put the vehicle in the waiting room
         self.enter(self.waiting_room)
+        print(len(self.waiting_room))
         #Check if there is a station that is passive
         for station in self.stations:
             if station.ispassive():
@@ -127,7 +153,7 @@ class sim_manager():
         self.shedual = Prepare()
         self.Charging_stations = Charging_Stations
         #Prepare the truck data
-        self.shedual.prepare_data()
+        self.shedual.prepare_data(spread_type=3)
 
     #This function runs the simmulation
     def run_sim(self):
@@ -157,11 +183,10 @@ class sim_manager():
         return int(avg),int(min_o),int(max_o)
 
     def reset_shedual(self):
-        self.shedual.prepare_data()
+        self.shedual.prepare_data(spread_type= 2)
 
-sim_m = sim_manager(3)
-print(sim_m.run_sim())
-sim_m.reset_shedual()
+
+sim_m = sim_manager(1)
 print(sim_m.run_sim())
 
 #-------------------------------------------------------------------------------------------
@@ -220,7 +245,7 @@ class TruckEnv(Env):
 
   
 env = TruckEnv()
-env.reset()
+#env.reset()
 log_path = os.path.join('.','logs')
 #model = PPO('MlpPolicy', env, verbose = 1, tensorboard_log = log_path)
 
