@@ -16,14 +16,31 @@ from dataclasses import dataclass
 import matplotlib.pyplot as plt
 import salabim as sim
 
+
+#-------------------------------------------------------------------------------------------
+def limit(lower,value,max):
+    if value < lower:
+        return lower
+    elif value > max:
+        return max
+    else:
+        return value
+    
 #-------------------------------------------------------------------------------------------
 #Struct that holds the information regarding a truck
 @dataclass
 class Truck:
-    Battery:            np.int16
-    Arrival_Time:       np.int16
-    total_time:         np.int16
-    total_wait_Time:    np.int16
+    Battery:                np.int16
+    Arrival_Time:           np.int16
+    total_time:             np.int16
+    total_wait_Time:        np.int16
+
+#Trcuk that hold charging station information
+@dataclass
+class Consumption:
+    Power_Consumption:      np.real#Current consumption
+    Max_Power_Consumption:  np.real#Max consumption from the 
+    Max_Power_Reqeust:      np.real#Max power the charging station is able to get
 
 #-------------------------------------------------------------------------------------------
 #Class that prepares a car arrival set
@@ -66,7 +83,8 @@ class Prepare():
         arrival_time = np.random.exponential(1/lambda_rate, 1)
         # Generate service times for the students (exponential distribution)
         service_times = np.random.exponential(1/mu_rate, 1)
-        return arrival_time[0],service_times[0]
+        return 10,60
+        #return arrival_time[0],service_times[0]
     
 
 #-------------------------------------------------------------------------------------------
@@ -102,12 +120,18 @@ class CustomerGenerator(sim.Component):
 
 
 class Charging_Station(sim.Component):
-    def __init__(self,waiting_room,env):
+    def __init__(self,waiting_room,env,power_supply,max_power_delivery):
         super().__init__()
         random.seed(time.time())
         self.waiting_room = waiting_room
         self.vehicle = 0
+        self.power_supply = power_supply
         self.env =  env
+        self.max_power_delivery = max_power_delivery
+        self.power_consumption = Consumption(0,0,0)
+        #Append the power consumption to the consumtion list
+        self.power_supply.power_used_list.append(self.power_consumption)
+        self.power_consumption.Max_Power_Reqeust = self.max_power_delivery
 
     def process(self):
         while True:
@@ -115,26 +139,43 @@ class Charging_Station(sim.Component):
             while len(self.waiting_room) == 0:
                 self.passivate()
             self.vehicle = self.waiting_room.pop()
-            self.charge_car()
-            
+            self.charge_car()           
 
     #This method charges car and stops when the car has been charged
     def charge_car(self):
         loop = 0
         add_Charge = 0
         self.vehicle.wait_times.append(self.env.now() - self.vehicle.creation_time)
+        
         while self.vehicle.battery_charge < 100:
+            #Determine the max power delivery that the charging station is able to give
+            #max_power = limit(0,self.max_power_delivery,self.power_supply.)
+            max_power = 0
+            
             if self.vehicle.battery_charge < 99:
-                add_Charge = 1
+                add_Charge = limit(0,1,self.power_consumption.Max_Power_Consumption)
+                print(add_Charge)
+                #add_Charge = limit(0,self.max_power_delivery, 100 - limit(0,self.vehicle.battery_charge,)
             else:
                 add_Charge = 100 - self.vehicle.battery_charge
-            self.hold(add_Charge)
+            #Note to the power supply much power is being used from it
+            self.power_consumption.Power_Consumption = add_Charge
+            
+            #Hold the simulation for the ammount being added
+            self.hold(limit(0.001,add_Charge,add_Charge))
             self.vehicle.battery_charge +=add_Charge
+            #print(self.vehicle.battery_charge)
             loop +=1
         #Calculate the time that the complete charging procedure took
-        
         return loop
 
+    #This method calculates the maximum amount of charge the charging pole is allowed to give
+    def max_power_consumption(self):
+        #Calculate the total amount of power already used by the charging stations
+        power_used = 0
+        for i in self.power_supply.power_used:
+            power_used += i
+       
 
 class Customer(sim.Component):
     def __init__(self,waiting_room,env,stations,wait_times,time_before_service,battery_charge):
@@ -158,6 +199,41 @@ class Customer(sim.Component):
                 break  # activate at most one clerk
         self.passivate()
 
+#This class resables the general power supply that the chraging stations are coupled to
+class Power_supply(sim.Component):
+    def __init__(self,env,max_power_from_Grid):
+        super().__init__()
+        self.max_power_from_grid = max_power_from_Grid
+        self.power_used_list = []
+        self.power_used = 0
+        self.env =  env
+
+    def process(self):
+        #Calculate the amount of energy that is currently being used
+        while True:
+            total = 0
+            self.__distribute_power()
+            #Check if the list has members
+            if len(self.power_used_list) != 0:
+                #Loop through all the charging stations
+                for i in self.power_used_list:
+                    total += i.Power_Consumption
+                self.hold(1)
+                print(total)
+            else:
+                pass
+
+    def __distribute_power(self):
+        #Loop through all the power cinsumers
+        total_distributed = 0
+        for i in self.power_used_list:
+            #Calculate the max distribution left
+            max_allowd = limit(0,self.max_power_from_grid - total_distributed,self.max_power_from_grid)
+            print("Max_Allowed",max_allowd)
+            i. Max_Power_Consumption = limit(0,i.Max_Power_Reqeust,max_allowd)
+            total_distributed += i. Max_Power_Consumption
+                                                
+
 #-------------------------------------------------------------------------------------------
 class sim_manager():
     def __init__(self,Charging_Stations,total_time):
@@ -176,15 +252,17 @@ class sim_manager():
         #Create the objects that make up the simmulation
         env_Sim = sim.Environment(trace=False)
         waiting_room = sim.Queue("waitingline88")
-        clerks = [Charging_Station(waiting_room=waiting_room,env=env_Sim) for _ in range(self.Charging_stations)]
-        generator = CustomerGenerator(waiting_room= waiting_room,env=env_Sim,clerks=clerks,wait_times = wait_Times,time_before_service=time_before_service,shedual= self.shedual.trucks )
+        Power_supply_o = Power_supply(env =env_Sim,max_power_from_Grid= 4.1)
+        stations = [Charging_Station(waiting_room=waiting_room,env=env_Sim,power_supply=Power_supply_o,max_power_delivery=2) for _ in range(self.Charging_stations)]
+        generator = CustomerGenerator(waiting_room= waiting_room,env=env_Sim,clerks=stations,wait_times = wait_Times,time_before_service=time_before_service,shedual= self.shedual.trucks )
+
         #Start the simmulation
         env_Sim.run(till=self.total_time)
         #Delete the objects from the memory
         del(env_Sim)
         del(waiting_room)
-        for clerk in clerks:
-            del(clerk)
+        for station in stations:
+            del(station)
         del(generator)
 
         #Get the output of the simmulation
@@ -198,7 +276,7 @@ class sim_manager():
         self.shedual.prepare_data(spread_type= 2)
 
 
-sim_m = sim_manager(1,800000)
+sim_m = sim_manager(3,1400)
 print(sim_m.run_sim())
 
 #-------------------------------------------------------------------------------------------
@@ -247,8 +325,6 @@ class TruckEnv(Env):
         print(arriaval_time)
         battery_np = np.array(battery)
         arriaval_time_np = np.array(arriaval_time)   
-
-
         #Create a 
         self.state = 100
         info = {}
