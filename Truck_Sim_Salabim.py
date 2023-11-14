@@ -15,7 +15,7 @@ from stable_baselines3.common.evaluation import evaluate_policy
 from dataclasses import dataclass
 import matplotlib.pyplot as plt
 import salabim as sim
-
+import gc
 
 #-------------------------------------------------------------------------------------------
 def limit(lower,value,max):
@@ -76,14 +76,14 @@ class Prepare():
 
     def poison(self):
         # Given parameters
-        lambda_rate = 40 / 60  # arrival rate in students per minute
+        lambda_rate = 100 / 60  # arrival rate in students per minute
         mu_rate = 50 / 60  # service rate in students per minute
 
         # Generate inter-arrival times for the students (Poisson process)
         arrival_time = np.random.exponential(1/lambda_rate, 1)
         # Generate service times for the students (exponential distribution)
         service_times = np.random.exponential(1/mu_rate, 1)
-        return 10,60
+        return 25,60
         #return arrival_time[0],service_times[0]
     
 
@@ -107,7 +107,7 @@ class CustomerGenerator(sim.Component):
                 #Get the next truck out of the list
                 truck = self.shedual.pop(0)
             else:
-                print("Break")
+                #print("Break")
                 #Break when there are no more trucks to create
                 break
             #Create a truck object
@@ -152,17 +152,16 @@ class Charging_Station(sim.Component):
             #max_power = limit(0,self.max_power_delivery,self.power_supply.)
             max_power = 0
             
-            if self.vehicle.battery_charge < 99:
+            if self.vehicle.battery_charge < 100 - self.max_power_delivery:
                 add_Charge = limit(0,1,self.power_consumption.Max_Power_Consumption)
-                print(add_Charge)
+                #print(add_Charge)
                 #add_Charge = limit(0,self.max_power_delivery, 100 - limit(0,self.vehicle.battery_charge,)
             else:
-                add_Charge = 100 - self.vehicle.battery_charge
+                add_Charge = 100 - limit(0,1,self.power_consumption.Max_Power_Consumption)
             #Note to the power supply much power is being used from it
-            self.power_consumption.Power_Consumption = add_Charge
-            
-            #Hold the simulation for the ammount being added
-            self.hold(limit(0.001,add_Charge,add_Charge))
+            self.power_consumption.Power_Consumption = add_Charge            
+            #Hold the simulation for 1 minute
+            self.hold(1)
             self.vehicle.battery_charge +=add_Charge
             #print(self.vehicle.battery_charge)
             loop +=1
@@ -207,32 +206,52 @@ class Power_supply(sim.Component):
         self.power_used_list = []
         self.power_used = 0
         self.env =  env
+        self.strategy = 0
 
     def process(self):
         #Calculate the amount of energy that is currently being used
         while True:
             total = 0
-            self.__distribute_power()
+            #Select the charging strategy
+            if self.strategy == 0:
+                self.__distribute_power_simple()
+            elif self.strategy == 1:
+                self.__disrtibute_power_share_equal()
             #Check if the list has members
             if len(self.power_used_list) != 0:
                 #Loop through all the charging stations
                 for i in self.power_used_list:
                     total += i.Power_Consumption
                 self.hold(1)
-                print(total)
+                #print(total)
             else:
                 pass
 
-    def __distribute_power(self):
+    def __distribute_power_simple(self):#This method resembles the simplest distribution (give max until it is out)
         #Loop through all the power cinsumers
         total_distributed = 0
         for i in self.power_used_list:
             #Calculate the max distribution left
             max_allowd = limit(0,self.max_power_from_grid - total_distributed,self.max_power_from_grid)
-            print("Max_Allowed",max_allowd)
-            i. Max_Power_Consumption = limit(0,i.Max_Power_Reqeust,max_allowd)
+            #print("Max_Allowed",max_allowd)
+            i.Max_Power_Consumption = limit(0,i.Max_Power_Reqeust,max_allowd)
+            #if i.Max_Power_Consumption == 0:
+                #print("No power_To_Pole")
             total_distributed += i. Max_Power_Consumption
                                                 
+    def __disrtibute_power_share_equal(self):#This method resables a equal share to all the charging stations
+        #Loop through all the power cinsumers
+        total_distributed = 0
+        if len(self.power_used_list) != 0:
+            available_per_station = self.max_power_from_grid / len(self.power_used_list)
+            for i in self.power_used_list:#Calculate the total amount
+                #Give the allowed power to the stations
+                i.Max_Power_Consumption = limit(0,i.Max_Power_Reqeust,available_per_station)
+
+
+
+
+
 
 #-------------------------------------------------------------------------------------------
 class sim_manager():
@@ -250,9 +269,11 @@ class sim_manager():
         #Prepare the truck data
 
         #Create the objects that make up the simmulation
-        env_Sim = sim.Environment(trace=False)
+        env_Sim = sim.Environment(trace=False,)
+        env_Sim.Monitor('.',stats_only= True)
         waiting_room = sim.Queue("waitingline88")
-        Power_supply_o = Power_supply(env =env_Sim,max_power_from_Grid= 4.1)
+        Power_supply_o = Power_supply(env =env_Sim,max_power_from_Grid= 5)
+        Power_supply_o.strategy = 0
         stations = [Charging_Station(waiting_room=waiting_room,env=env_Sim,power_supply=Power_supply_o,max_power_delivery=2) for _ in range(self.Charging_stations)]
         generator = CustomerGenerator(waiting_room= waiting_room,env=env_Sim,clerks=stations,wait_times = wait_Times,time_before_service=time_before_service,shedual= self.shedual.trucks )
 
@@ -265,6 +286,7 @@ class sim_manager():
             del(station)
         del(generator)
 
+
         #Get the output of the simmulation
         avg = sum(wait_Times)/len(wait_Times)
         min_o = min(wait_Times)
@@ -273,11 +295,18 @@ class sim_manager():
         return avg,int(min_o),int(max_o)
 
     def reset_shedual(self):
-        self.shedual.prepare_data(spread_type= 2)
+        self.shedual.prepare_data(spread_type= 3)
 
+count = 0 
 
-sim_m = sim_manager(3,1400)
-print(sim_m.run_sim())
+for i in range(10000):
+    if count >1000:
+        print("1000 passed")
+        count = 0
+    count += 1
+    sim_m = sim_manager(3,1400)
+    sim_m.run_sim()
+    del(sim_m)
 
 #-------------------------------------------------------------------------------------------
 #Create a truck enviroment that the model is going to perform in
