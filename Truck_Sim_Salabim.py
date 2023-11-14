@@ -78,12 +78,11 @@ class Prepare():
         # Given parameters
         lambda_rate = 100 / 60  # arrival rate in students per minute
         mu_rate = 50 / 60  # service rate in students per minute
-
         # Generate inter-arrival times for the students (Poisson process)
         arrival_time = np.random.exponential(1/lambda_rate, 1)
         # Generate service times for the students (exponential distribution)
         service_times = np.random.exponential(1/mu_rate, 1)
-        return 25,60
+        return 1,60
         #return arrival_time[0],service_times[0]
     
 
@@ -153,11 +152,12 @@ class Charging_Station(sim.Component):
             max_power = 0
             
             if self.vehicle.battery_charge < 100 - self.max_power_delivery:
-                add_Charge = limit(0,1,self.power_consumption.Max_Power_Consumption)
+                add_Charge = self.power_consumption.Max_Power_Consumption
                 #print(add_Charge)
                 #add_Charge = limit(0,self.max_power_delivery, 100 - limit(0,self.vehicle.battery_charge,)
             else:
-                add_Charge = 100 - limit(0,1,self.power_consumption.Max_Power_Consumption)
+                add_Charge = self.power_consumption.Max_Power_Consumption
+            print("add_Charge",add_Charge)
             #Note to the power supply much power is being used from it
             self.power_consumption.Power_Consumption = add_Charge            
             #Hold the simulation for 1 minute
@@ -204,9 +204,11 @@ class Power_supply(sim.Component):
         super().__init__()
         self.max_power_from_grid = max_power_from_Grid
         self.power_used_list = []
+        self.distribution_rl = []
         self.power_used = 0
         self.env =  env
         self.strategy = 0
+        self.max_reached = False
 
     def process(self):
         #Calculate the amount of energy that is currently being used
@@ -217,6 +219,8 @@ class Power_supply(sim.Component):
                 self.__distribute_power_simple()
             elif self.strategy == 1:
                 self.__disrtibute_power_share_equal()
+            elif self.strategy == 2:
+                self.__distribute_power_rl(rl_distribution=self.distribution_rl)
             #Check if the list has members
             if len(self.power_used_list) != 0:
                 #Loop through all the charging stations
@@ -240,7 +244,7 @@ class Power_supply(sim.Component):
             total_distributed += i. Max_Power_Consumption
                                                 
     def __disrtibute_power_share_equal(self):#This method resables a equal share to all the charging stations
-        #Loop through all the power cinsumers
+        #Loop through all the power consumers
         total_distributed = 0
         if len(self.power_used_list) != 0:
             available_per_station = self.max_power_from_grid / len(self.power_used_list)
@@ -248,10 +252,23 @@ class Power_supply(sim.Component):
                 #Give the allowed power to the stations
                 i.Max_Power_Consumption = limit(0,i.Max_Power_Reqeust,available_per_station)
 
-
-
-
-
+    def __distribute_power_rl(self,rl_distribution):#This method is used to distribute the power with the help of reinforcemnt learning
+        total_distributed = 0
+        counter = 0
+        if len(self.power_used_list) != 0:
+            for i in self.power_used_list:
+                max_allowd = limit(0,self.max_power_from_grid - total_distributed,self.max_power_from_grid)
+                max_allowd = limit(0,max_allowd,i.Max_Power_Reqeust)
+                max_allowd = limit(0,max_allowd,limit(0,self.max_power_from_grid - total_distributed,self.max_power_from_grid - total_distributed))
+                #Note to the system when the maximum energy consumption is reached
+                if max_allowd == 0:
+                    self.max_reached = True
+                else:
+                    self.max_reached = False
+                #Insert the max power consumption from the reinforcement learning model into 
+                i.Max_Power_Consumption = limit(0,rl_distribution[counter],max_allowd)       
+                total_distributed += i. Max_Power_Consumption
+                counter += 1
 
 #-------------------------------------------------------------------------------------------
 class sim_manager():
@@ -272,9 +289,10 @@ class sim_manager():
         env_Sim = sim.Environment(trace=False,)
         env_Sim.Monitor('.',stats_only= True)
         waiting_room = sim.Queue("waitingline88")
-        Power_supply_o = Power_supply(env =env_Sim,max_power_from_Grid= 5)
-        Power_supply_o.strategy = 0
-        stations = [Charging_Station(waiting_room=waiting_room,env=env_Sim,power_supply=Power_supply_o,max_power_delivery=2) for _ in range(self.Charging_stations)]
+        Power_supply_o = Power_supply(env =env_Sim,max_power_from_Grid= 200)
+        Power_supply_o.distribution_rl = [10,20,20]
+        Power_supply_o.strategy = 2
+        stations = [Charging_Station(waiting_room=waiting_room,env=env_Sim,power_supply=Power_supply_o,max_power_delivery=20) for _ in range(self.Charging_stations)]
         generator = CustomerGenerator(waiting_room= waiting_room,env=env_Sim,clerks=stations,wait_times = wait_Times,time_before_service=time_before_service,shedual= self.shedual.trucks )
 
         #Start the simmulation
@@ -299,14 +317,13 @@ class sim_manager():
 
 count = 0 
 
-for i in range(10000):
+for i in range(1):
     if count >1000:
         print("1000 passed")
         count = 0
     count += 1
     sim_m = sim_manager(3,1400)
-    sim_m.run_sim()
-    del(sim_m)
+    print(sim_m.run_sim())
 
 #-------------------------------------------------------------------------------------------
 #Create a truck enviroment that the model is going to perform in
